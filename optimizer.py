@@ -72,55 +72,52 @@ def port_variance(price_data,sims):
 
 
 
-def efficient_frontier(price_data, risk_free_rate, n_points, sims,tolerance=0.0001):
+def efficient_frontier(price_data, risk_free_rate, n_points, sims, tolerance=0.0001):
     returns = price_data.pct_change().dropna()
     mean_returns = returns.mean()
     cov_matrix = returns.cov()
 
-    data_for_use = port_variance(price_data,sims)
+    data_for_use = port_variance(price_data, sims)
+    best_possible_return_with_low_vol = data_for_use["best possible returns"]  
 
-    volatility = data_for_use["Volatility"]
-    best_possible_return_with_low_vol = data_for_use["best possible returns"]
+   
+    max_return_asset = mean_returns.idxmax()                         
+    max_return_value = mean_returns.max()                            
 
-    max_return_asset = mean_retruns.idxmax()
-    max_retrun_values = mean_retruns.max()
+    max_return_weights = [0] * len(returns.columns)                  
+    asset_index = list(returns.columns).index(max_return_asset)      
+    max_return_weights[asset_index] = 1.0                            
 
-    max_returns_weight = [0]*len(returns.columns)
-    asset_index = list(returns.columns).index(max_returns)
-    max_return_weight[asset_index] = 1.0
+    step_size = (max_return_value - best_possible_return_with_low_vol) / (n_points - 1)  
 
-    step_size = (max_return_value - best_possible_return_with_low_vol)/(n_points-1)
-    
     targets = []
-    frontier_points = []
-
     for i in range(n_points):
-        target = min_vol_retrun + i*step_size
+        target = best_possible_return_with_low_vol + i * step_size
         targets.append(target)
 
-    weights = []
-
+    equal_weights = []
     for i in range(len(returns.columns)):
-        weights.append(1/len(returns.columns))
+        equal_weights.append(1 / len(returns.columns))
+
+    frontier_points = []
 
     for target in targets:
-        best_vol_for_target = np.inf()
-        best_weights_for_target = weights
+        best_vol_for_target = float('inf')                           
+        best_weights_for_target = equal_weights.copy()
 
         for i in range(sims):
             nw = np.random.random(len(returns.columns))
-            nw = nw/nw.sum()
+            nw = nw / nw.sum()
 
-            n_pr = np.dot(weights,mean_returns)
-            n_pv = np.sqrt(np.transpose(nw)@cov@nw)
+            n_pr = np.dot(nw, mean_returns)                          
+            n_pv = np.sqrt(np.transpose(nw) @ cov_matrix @ nw)     
 
-            if abs(n_pr - target)<tolerance:
-
+            if abs(n_pr - target) < tolerance:
                 if n_pv < best_vol_for_target:
                     best_vol_for_target = n_pv
                     best_weights_for_target = nw
 
-        frontier_points.append([target,best_vol,best_weights_for_target])
+        frontier_points.append([target, best_vol_for_target, best_weights_for_target])  
 
 ############3test data 
 
