@@ -1,7 +1,7 @@
-import pandas as pd
+port pandas as pd
 import numpy as np
 
-def optimizer(risk_free_rate,price_data,sims):
+def Sharpe_with_weight(risk_free_rate,price_data,sims):
     returns = price_data.pct_change().dropna()
     mean_returns = returns.mean()
     cov_matrix = returns.cov()
@@ -38,6 +38,38 @@ def optimizer(risk_free_rate,price_data,sims):
     return best_portfolio
 
 
+def port_variance(price_data,sims):
+    returns = price_data.pct_change().dropna()
+    mean_returns = returns.mean()
+    cov_matrix = returns.cov()
+
+    init_weights = []
+
+    for i in range(len(price_data.columns)):
+        init_weights.append(1/len(price_data.columns))
+
+
+    port_variance = np.transpose(init_weights)@cov_matrix@init_weights
+
+    port_volatility = np.sqrt(port_variance)
+
+    best_volatility = 0
+
+    for i in range(sims):
+        nw = np.random.random(len(returns.columns))
+        nw = nw/nw.sum()
+
+        new_volatility = np.sqrt(np.transpose(nw)@cov_matrix@nw)
+
+        if new_volatility < port_volatility:
+            best_volatility = new_volatility
+            init_weights = nw
+
+    return f"Best volatility {best_volatility} with optimal weights {init_weights}"
+
+    
+    
+
 ############3test data 
 
 price_data = pd.DataFrame({
@@ -45,3 +77,6 @@ price_data = pd.DataFrame({
     'GOOGL': [140.0, 141.5, 143.0, 142.0, 144.0],
     'JPM':   [155.0, 153.0, 157.0, 156.5, 158.0]
 }, index=pd.date_range('2024-01-01', periods=5, freq='B'))
+
+
+
