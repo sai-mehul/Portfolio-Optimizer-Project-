@@ -1,4 +1,4 @@
-port pandas as pd
+import pandas as pd
 import numpy as np
 
 def Sharpe_with_weight(risk_free_rate,price_data,sims):
