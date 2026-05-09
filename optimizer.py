@@ -1,149 +1,168 @@
 import pandas as pd
 import numpy as np
 
-def Sharpe_with_weight(risk_free_rate,price_data,sims):
-    returns = price_data.pct_change().dropna()
-    mean_returns = returns.mean()
-    cov_matrix = returns.cov()
 
+class PortfolioOptimizer:
+    
+    def __init__(self, price_data, risk_free_rate=0.05, sims=10000):
+        self.price_data = price_data
+        self.risk_free_rate = risk_free_rate
+        self.sims = sims
+        
 
-    init_weights = []
+        self.returns = price_data.pct_change().dropna()
+        self.mean_returns = self.returns.mean()
+        self.cov_matrix = self.returns.cov()
+        self.n_assets = len(self.returns.columns)
+        self.tickers = list(self.returns.columns)
+        
 
-    for i in range(len(price_data.columns)):
-        init_weights.append(1/len(price_data.columns))
+        self.equal_weights = np.array([1/self.n_assets] * self.n_assets)
+    
+    def _portfolio_stats(self, weights):
+        """Return (return, volatility, sharpe) for given weights."""
+        ret = np.dot(weights, self.mean_returns)
+        vol = np.sqrt(weights @ self.cov_matrix @ weights)
+        sharpe = (ret - self.risk_free_rate) / vol
+        return ret, vol, sharpe
+    
 
-    df = pd.DataFrame({"Weights":pd.Series(dtype="object"),"Sharpe":pd.Series(dtype="float")})
+    def max_sharpe(self):
+        """Find portfolio that maximizes Sharpe ratio."""
+        sr_best = (np.dot(self.equal_weights, self.mean_returns) - self.risk_free_rate) / \
+                  np.sqrt(self.equal_weights @ self.cov_matrix @ self.equal_weights)
+        weights_best = self.equal_weights.copy()
+        
+        improvements = []
+        
+        for _ in range(self.sims):
+            w = np.random.random(self.n_assets)
+            w = w / w.sum()
+            
+            ret, vol, sharpe = self._portfolio_stats(w)
+            
+            if sharpe > sr_best:
+                sr_best = sharpe
+                weights_best = w
+                improvements.append({
+                    "weights": w.tolist(),
+                    "sharpe": sharpe,
+                    "return": ret,
+                    "volatility": vol
+                })
+        
+        best_ret, best_vol, _ = self._portfolio_stats(weights_best)
+        
+        return {
+            "weights": dict(zip(self.tickers, weights_best)),
+            "sharpe": sr_best,
+            "return": best_ret,
+            "volatility": best_vol,
+            "improvements": len(improvements)
+        }
 
-    pv = np.sqrt(np.transpose(init_weights)@cov_matrix@init_weights)
-    pr = np.dot(init_weights,mean_returns)
-    sr = (pr-risk_free_rate)/pv
+    def min_variance(self):
+        """Find portfolio with minimum volatility."""
+        vol_best = float('inf')
+        weights_best = self.equal_weights.copy()
+        
+        for _ in range(self.sims):
+            w = np.random.random(self.n_assets)
+            w = w / w.sum()
+            
+            vol = np.sqrt(w @ self.cov_matrix @ w)
+            
+            if vol < vol_best:
+                vol_best = vol
+                weights_best = w
+        
+        ret_best = np.dot(weights_best, self.mean_returns)
+        
+        return {
+            "weights": dict(zip(self.tickers, weights_best)),
+            "volatility": vol_best,
+            "return": ret_best
+        }
+    
 
-    for i in range(sims):
-        adjusted_weights = np.random.random(len(returns.columns))
-        adjusted_weights = adjusted_weights/adjusted_weights.sum()
-
-        n_pv = np.sqrt(np.transpose(adjusted_weights)@cov_matrix@adjusted_weights)
-        n_pr = np.dot(adjusted_weights,mean_returns)
-        n_sr = (n_pr - risk_free_rate)/n_pv
-
-        if n_sr > sr:
-            sr = n_sr
-            weights = adjusted_weights
-            df.loc[len(df)] = [adjusted_weights.tolist(), n_sr]
-
-
-
-    best_portfolio = df.loc[df["Sharpe"].idxmax()]
-
-    return best_portfolio
-
-
-def port_variance(price_data,sims):
-    returns = price_data.pct_change().dropna()
-    mean_returns = returns.mean()
-    cov_matrix = returns.cov()
-
-    init_weights = []
-
-    for i in range(len(price_data.columns)):
-        init_weights.append(1/len(price_data.columns))
-
-
-    port_variance = np.transpose(init_weights)@cov_matrix@init_weights
-
-    port_volatility = np.sqrt(port_variance)
-
-    best_volatility = float('inf')
-    best_return = 0
-
-    for i in range(sims):
-        nw = np.random.random(len(returns.columns))
-        nw = nw/nw.sum()
-
-        new_volatility = np.sqrt(np.transpose(nw)@cov_matrix@nw)
-
-        if new_volatility < port_volatility:
-            best_volatility = new_volatility
-            init_weights = nw
-            best_return = np.dot(nw,mean_returns)
-    return{"volatility": best_volatility,"weights": init_weights,"best possible returns":best_return}
-
-
-
-
-
-def efficient_frontier(price_data, risk_free_rate, n_points, sims, tolerance=0.0001):
-    returns = price_data.pct_change().dropna()
-    mean_returns = returns.mean()
-    cov_matrix = returns.cov()
-
-    data_for_use = port_variance(price_data, sims)
-    best_possible_return_with_low_vol = data_for_use["best possible returns"]  
-
-   
-    max_return_asset = mean_returns.idxmax()                         
-    max_return_value = mean_returns.max()                            
-
-    max_return_weights = [0] * len(returns.columns)                  
-    asset_index = list(returns.columns).index(max_return_asset)      
-    max_return_weights[asset_index] = 1.0                            
-
-    step_size = (max_return_value - best_possible_return_with_low_vol) / (n_points - 1)  
-
-    targets = []
-    for i in range(n_points):
-        target = best_possible_return_with_low_vol + i * step_size
-        targets.append(target)
-
-    equal_weights = []
-    for i in range(len(returns.columns)):
-        equal_weights.append(1 / len(returns.columns))
-
-    frontier_points = []
-
-    for target in targets:
-        best_vol_for_target = float('inf')                           
-        best_weights_for_target = equal_weights.copy()
-
-        for i in range(sims):
-            nw = np.random.random(len(returns.columns))
-            nw = nw / nw.sum()
-
-            n_pr = np.dot(nw, mean_returns)                          
-            n_pv = np.sqrt(np.transpose(nw) @ cov_matrix @ nw)     
-
-            if abs(n_pr - target) < tolerance:
-                if n_pv < best_vol_for_target:
-                    best_vol_for_target = n_pv
-                    best_weights_for_target = nw
-
-        frontier_points.append([target, best_vol_for_target, best_weights_for_target])
-
-
-    max_sharpe_point = Sharpe_with_weight(risk_free_rate, price_data, sims)
-
-
-    individual_assets = []
-
-    for ticker in returns.columns:
-        w = [0]*len(returns.columns)
-        w[list(returns.columns).index(ticker)] = 0
-
-        asset_ret = mean_returns[ticker]
-        asset_vol = np.sqrt(cov_matrix[ticker][ticker])
-
-    individual_assets.append({
-        "ticker": ticker,
-        "return": asset_ret,
-        "volatility": asset_vol,
-        "weights": w
-    })
-
-    return {
-    "frontier": frontier_points,
-    "max_sharpe": max_sharpe_point,
-    "individual_assets": individual_assets
-}
+    def max_return_for_vol(self, target_vol):
+        """Maximize return subject to volatility <= target_vol."""
+        ret_best = -float('inf')
+        weights_best = self.equal_weights.copy()
+        
+        for _ in range(self.sims):
+            w = np.random.random(self.n_assets)
+            w = w / w.sum()
+            
+            ret, vol, _ = self._portfolio_stats(w)
+            
+            if vol <= target_vol and ret > ret_best:
+                ret_best = ret
+                weights_best = w
+        
+        best_vol = np.sqrt(weights_best @ self.cov_matrix @ weights_best)
+        
+        return {
+            "weights": dict(zip(self.tickers, weights_best)),
+            "return": ret_best,
+            "volatility": best_vol
+        }
+    
+    def efficient_frontier(self, n_points=20, tolerance=0.0001):
+        # Endpoints
+        min_var_result = self.min_variance()
+        min_var_return = min_var_result["return"]
+        
+        max_return_value = self.mean_returns.max()
+        
+        # Target returns
+        step = (max_return_value - min_var_return) / (n_points - 1)
+        targets = [min_var_return + i * step for i in range(n_points)]
+        
+        frontier_points = []
+        
+        for target in targets:
+            best_vol = float('inf')
+            best_weights = self.equal_weights.copy()
+            
+            for _ in range(self.sims // n_points):  # split sims across targets
+                w = np.random.random(self.n_assets)
+                w = w / w.sum()
+                
+                ret, vol, _ = self._portfolio_stats(w)
+                
+                if abs(ret - target) < tolerance:
+                    if vol < best_vol:
+                        best_vol = vol
+                        best_weights = w
+            
+            frontier_points.append({
+                "target_return": target,
+                "volatility": best_vol,
+                "weights": dict(zip(self.tickers, best_weights))
+            })
+        
+        # Max Sharpe point
+        max_sharpe_result = self.max_sharpe()
+        
+        # Individual assets
+        individual_assets = []
+        for ticker in self.tickers:
+            w = np.zeros(self.n_assets)
+            w[self.tickers.index(ticker)] = 1.0
+            
+            individual_assets.append({
+                "ticker": ticker,
+                "return": self.mean_returns[ticker],
+                "volatility": np.sqrt(self.cov_matrix[ticker][ticker]),
+                "weights": dict(zip(self.tickers, w))
+            })
+        
+        return {
+            "frontier": frontier_points,
+            "max_sharpe": max_sharpe_result,
+            "individual_assets": individual_assets
+        }
 
 
 
