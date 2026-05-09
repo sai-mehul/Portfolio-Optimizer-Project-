@@ -117,7 +117,35 @@ def efficient_frontier(price_data, risk_free_rate, n_points, sims, tolerance=0.0
                     best_vol_for_target = n_pv
                     best_weights_for_target = nw
 
-        frontier_points.append([target, best_vol_for_target, best_weights_for_target])  
+        frontier_points.append([target, best_vol_for_target, best_weights_for_target])
+
+
+    max_sharpe_point = Sharpe_with_weight(risk_free_rate, price_data, sims)
+
+
+    individual_assets = []
+
+    for ticker in returns.columns:
+        w = [0]*len(returns.columns)
+        w[list(returns.columns).index(ticker)] = 0
+
+        asset_ret = mean_returns[ticker]
+        asset_vol = np.sqrt(cov_matrix[ticker][ticker])
+
+    individual_assets.append({
+        "ticker": ticker,
+        "return": asset_ret,
+        "volatility": asset_vol,
+        "weights": w
+    })
+
+    return {
+    "frontier": frontier_points,
+    "max_sharpe": max_sharpe_point,
+    "individual_assets": individual_assets
+}
+
+
 
 ############3test data 
 
@@ -126,5 +154,8 @@ price_data = pd.DataFrame({
     'GOOGL': [140.0, 141.5, 143.0, 142.0, 144.0],
     'JPM':   [155.0, 153.0, 157.0, 156.5, 158.0]
 }, index=pd.date_range('2024-01-01', periods=5, freq='B'))
+
+
+
 
 
