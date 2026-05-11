@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from scipy.stats import norm 
 
 def hist_var(returns,alpha,portfolio_val):
     sorted_rets = np.sort(returns)
@@ -8,6 +9,17 @@ def hist_var(returns,alpha,portfolio_val):
     VaR_amount = portfolio_val*sorted_rets[index_of_VaR]
 
     return VaR_amount
+
+
+def parametric_var(returns,alpha,portfolio_value):
+    mu = np.mean(returns)
+    sigma = np.std(returns)
+
+    z = norm.ppf(alpha)
+
+    Var = portfolio_value*(z*sigma-mu)
+
+    return Var
 
 
 ###for testing
